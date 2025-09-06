@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 
 class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.CustomDocument> {
 	public static register(context: vscode.ExtensionContext): vscode.Disposable {
@@ -28,23 +29,34 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 			webviewPanel.webview.options = {
 				enableScripts: true
 			};
-			let pklContent = "not found";
-			const { exec } = require('child_process');
-			exec(`python -m pickle ${filepath}`, (error:any, stdout:any, stderr:any) => {
-				if (error) {
-					console.error(`error: ${error.message}`);
-					return;
-				}
+			// helper to promisify exec
+			function execAsync(cmd: string): Promise<string> {
+				const { exec } = require('child_process');
+				return new Promise((resolve, reject) => {
+					exec(cmd, (error: any, stdout: any, stderr: any) => {
+						if (error) {
+							reject(error);
+							return;
+						}
+						if (stderr) {
+							console.error(`stderr: ${stderr}`);
+						}
+						resolve(stdout);
+					});
+				});
+			}
+			try {
+				// run two commands in parallel
+				const [output1, output2] = await Promise.all([
+					execAsync(`python -m pickle ${filepath}`),
+					execAsync(`python -m pickletools ${filepath}`)
+				]);
 
-				if (stderr) {
-					console.error(`stderr: ${stderr}`);
-					return;
-				}
-
-				console.log(`stdout:\n${stdout}`);
-				pklContent = stdout;
-				webviewPanel.webview.html = this.getPanelHTML(pklContent);
-			});
+				const combinedContent = `<pre>Output 1 (pickle):\n${output1}</pre><pre>Output 2 (pickletools):\n${output2}</pre>`;
+				webviewPanel.webview.html = this.getPanelHTML(combinedContent);
+			} catch (err: any) {
+				webviewPanel.webview.html = this.getPanelHTML(`<span style='color:red;'>Error: ${err.message}</span>`);
+			}
 		}
 	}
 
@@ -57,16 +69,26 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 	}
 
 	getPanelHTML(content:string) {
+		const cssPath = vscode.Uri.joinPath(this.context.extensionUri, 'src', 'panelWebview.css');
+		const cssContent = fs.readFileSync(cssPath.fsPath, 'utf8');
+
 		return `<!DOCTYPE html>
 		<html lang="en">
 		<head>
 			<meta charset="UTF-8">
 			<meta name="viewport" content="width=device-width, initial-scale=1.0">
 			<title>PKL Preview</title>
+			<style>
+				${cssContent}
+			</style>
 		</head>
 		<body>
 			<h3>pickle</h3>
 			${content}
+			<div class="tooltip">
+                <button class="load-more">Load Full Readable Pickle</button>
+                <span class="tooltiptext">Warning: This may be slow and unsafe if pickle is malicious</span>
+            </div>
 		</body>
 		</html>`;
 	}
