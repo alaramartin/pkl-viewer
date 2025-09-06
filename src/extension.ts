@@ -2,24 +2,51 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 
+class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.CustomDocument> {
+	public static register(context: vscode.ExtensionContext): vscode.Disposable {
+		const provider = new PKLEditorProvider(context);
+		const providerRegistration = vscode.window.registerCustomEditorProvider(PKLEditorProvider.viewType, provider, {
+			supportsMultipleEditorsPerDocument: false
+		});
+		return providerRegistration;
+	}
+
+	private static readonly viewType = "pklViewer.pkl";
+
+	constructor(
+		private readonly context: vscode.ExtensionContext
+	) { }
+
+	// handle switching to a .pkl file
+	async resolveCustomEditor(
+		document:vscode.CustomDocument,
+		webviewPanel:vscode.WebviewPanel,
+		token:vscode.CancellationToken
+	):Promise<void> {
+		// get the filepath of the new focused file and check if it's pkl
+		let filepath = document.uri.fsPath;
+		if (filepath.includes(".pkl")) {
+			console.log("this is a .pkl file");
+			webviewPanel.webview.options = {
+				enableScripts: true
+			};
+		}
+	}
+
+	// required method for a custom editor
+	async openCustomDocument(uri:vscode.Uri,
+		openContext:vscode.CustomDocumentOpenContext,
+		token:vscode.CancellationToken
+	):Promise<vscode.CustomDocument> {
+		return {uri, dispose: () => {} };
+	}
+}
+
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
-
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "pkl-viewer" is now active!');
-
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('pkl-viewer.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from pkl-viewer!');
-	});
-
-	context.subscriptions.push(disposable);
+	// register the custom editor
+	context.subscriptions.push(PKLEditorProvider.register(context));
 }
 
 // This method is called when your extension is deactivated

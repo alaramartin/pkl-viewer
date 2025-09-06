@@ -17,6 +17,18 @@
         "command": "pkl-viewer.helloWorld",
         "title": "Hello World"
       }
+    ],
+    "customEditors": [
+      {
+        "viewType": "pklViewer.pkl",
+        "displayName": "PKL Viewer",
+        "selector": [
+          {
+            "filenamePattern": "*.pkl"
+          }
+        ],
+        "priority": "default"
+      }
     ]
   },
   "scripts": {
