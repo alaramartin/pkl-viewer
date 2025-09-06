@@ -1,5 +1,3 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 
 class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.CustomDocument> {
@@ -30,6 +28,23 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 			webviewPanel.webview.options = {
 				enableScripts: true
 			};
+			let pklContent = "not found";
+			const { exec } = require('child_process');
+			exec(`python -m pickle ${filepath}`, (error:any, stdout:any, stderr:any) => {
+				if (error) {
+					console.error(`error: ${error.message}`);
+					return;
+				}
+
+				if (stderr) {
+					console.error(`stderr: ${stderr}`);
+					return;
+				}
+
+				console.log(`stdout:\n${stdout}`);
+				pklContent = stdout;
+				webviewPanel.webview.html = this.getPanelHTML(pklContent);
+			});
 		}
 	}
 
@@ -40,14 +55,28 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 	):Promise<vscode.CustomDocument> {
 		return {uri, dispose: () => {} };
 	}
+
+	getPanelHTML(content:string) {
+		return `<!DOCTYPE html>
+		<html lang="en">
+		<head>
+			<meta charset="UTF-8">
+			<meta name="viewport" content="width=device-width, initial-scale=1.0">
+			<title>PKL Preview</title>
+		</head>
+		<body>
+			<h3>pickle</h3>
+			${content}
+		</body>
+		</html>`;
+	}
 }
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
+// called when extension is activated
 export function activate(context: vscode.ExtensionContext) {
 	// register the custom editor
 	context.subscriptions.push(PKLEditorProvider.register(context));
 }
 
-// This method is called when your extension is deactivated
+// called when extension is deactivated
 export function deactivate() {}
