@@ -57,6 +57,28 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 			} catch (err: any) {
 				webviewPanel.webview.html = this.getPanelHTML(`<span style='color:red;'>Error: ${err.message}</span>`);
 			}
+
+			// listen to message that button was clicked
+			webviewPanel.webview.onDidReceiveMessage(
+				async message => {
+					switch (message.command) {
+						case "load more":
+							console.log("load more message received");
+							// use -mpickle and update the html
+							try {
+								const pickleOutput = await execAsync(`python -m pickle ${filepath}`);
+								webviewPanel.webview.html = this.getPanelHTML(pickleOutput);
+								
+							} catch (err: any) {
+								// tell user there is an error, then stay with original pickletools
+								console.log(err);
+								vscode.window.showInformationMessage("There was an error loading the full Pickle file.");
+							}
+					}
+				},
+				undefined,
+				this.context.subscriptions
+			);
 		}
 	}
 
@@ -71,6 +93,8 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 	getPanelHTML(content:string) {
 		const cssPath = vscode.Uri.joinPath(this.context.extensionUri, 'src', 'panelWebview.css');
 		const cssContent = fs.readFileSync(cssPath.fsPath, 'utf8');
+		const scriptPath = vscode.Uri.joinPath(this.context.extensionUri, 'src', 'webview.js');
+		const scriptContent = fs.readFileSync(scriptPath.fsPath, 'utf8');
 
 		return `<!DOCTYPE html>
 		<html lang="en">
@@ -85,10 +109,13 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 		<body>
 			<h3>pickle</h3>
 			${content}
-			<div class="tooltip">
+			<div class="tooltip" style="position: fixed; bottom: 50px; right: 50px;">
                 <button class="load-more">Load Full Readable Pickle</button>
                 <span class="tooltiptext">Warning: This may be slow and unsafe if pickle is malicious</span>
             </div>
+			<script>
+				${scriptContent}
+			</script>
 		</body>
 		</html>`;
 	}

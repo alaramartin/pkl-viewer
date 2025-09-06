@@ -1,4 +1,6 @@
 .load-more {
+    bottom: 50px;
+    right: 50px;
     background: #384d3e;
     color: white;
     border: #273635;
@@ -23,8 +25,9 @@
     position: absolute;  
     z-index: 1000;  
     bottom: 125%;  
-    left: 50%;  
-    margin-left: -100px;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-left: 0;
     font-size: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }  
