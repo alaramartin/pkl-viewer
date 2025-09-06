@@ -8,9 +8,21 @@ document.addEventListener("DOMContentLoaded", function() {
             vscode.postMessage({
                 command: "load more"
             });
-            // remove the button
-            e.target.style.display = this.none;
-            // todo: loading animation until loading complete? will have to send a message back from extension to webview
+        }
+    });
+
+    // todo: loading animation until loading complete? will have to send a message back from extension to webview
+    window.addEventListener("message", function(e) {
+        const command = e.data.command;
+        console.log("received");
+        // if page update successful, remove the button
+        // todo: replace load button with revert button?
+        if (command === "success") {
+            const loadButton = document.querySelector(".load-more");
+            if (loadButton) {
+                loadButton.style.display = "none";
+                console.log("removed");
+            }
         }
     });
 });

@@ -46,14 +46,10 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 				});
 			}
 			try {
-				// run two commands in parallel
-				const [output1, output2] = await Promise.all([
-					execAsync(`python -m pickle ${filepath}`),
-					execAsync(`python -m pickletools ${filepath}`)
-				]);
-
-				const combinedContent = `<pre>Output 1 (pickle):\n${output1}</pre><pre>Output 2 (pickletools):\n${output2}</pre>`;
-				webviewPanel.webview.html = this.getPanelHTML(combinedContent);
+				// get safe and quick output
+				const pickletoolsOutput = await execAsync(`python -m pickletools ${filepath}`);
+				const content = `<pre>Default pickletools output:\n${pickletoolsOutput}</pre>`;
+				webviewPanel.webview.html = this.getPanelHTML(content);
 			} catch (err: any) {
 				webviewPanel.webview.html = this.getPanelHTML(`<span style='color:red;'>Error: ${err.message}</span>`);
 			}
@@ -67,8 +63,12 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 							// use -mpickle and update the html
 							try {
 								const pickleOutput = await execAsync(`python -m pickle ${filepath}`);
-								webviewPanel.webview.html = this.getPanelHTML(pickleOutput);
-								
+								const content = `<pre>Full pickle output:\n${pickleOutput}</pre>`;
+								webviewPanel.webview.html = this.getPanelHTML(content);
+								// send a message back that it was successful
+								webviewPanel.webview.postMessage({
+									command: "success"
+								});
 							} catch (err: any) {
 								// tell user there is an error, then stay with original pickletools
 								console.log(err);
