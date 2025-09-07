@@ -1,6 +1,23 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 
+// get either python or python3 or whatever the user uses to increase compatibility
+async function getPythonPath(): Promise<string> {
+    const pythonExt = vscode.extensions.getExtension('ms-python.python');
+    if (pythonExt) {
+        if (!pythonExt.isActive) {
+            await pythonExt.activate();
+        }
+        const pythonApi = pythonExt.exports;
+        const execDetails = await pythonApi.settings.getExecutionDetails();
+        if (execDetails && execDetails.execCommand && execDetails.execCommand.length > 0) {
+            return execDetails.execCommand[0];
+        }
+    }
+    // fallback to python3
+    return "python3";
+}
+
 class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.CustomDocument> {
 	public static register(context: vscode.ExtensionContext): vscode.Disposable {
 		const provider = new PKLEditorProvider(context);
@@ -28,6 +45,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 			// save the full pickle content if it gets loaded once
 			let fullPickleContent = "";
 			let fullPickleToolsContent = "";
+			const pythonPath = await getPythonPath();
 
 			console.log("this is a .pkl file");
 			webviewPanel.webview.options = {
@@ -60,7 +78,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 			}
 			try {
 				// get safe and quick output
-				fullPickleToolsContent = await spawnAsync('python', ['-m', 'pickletools', filepath]);
+				fullPickleToolsContent = await spawnAsync(pythonPath, ['-m', 'pickletools', filepath]);
 				const content = `<pre>pickletools output (Default):\n${fullPickleToolsContent}</pre>`;
 				webviewPanel.webview.html = this.getPanelHTML(content);
 			} catch (err: any) {
@@ -78,7 +96,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 								let oldButtonName = ".re-revert";
 								const newButtonName = ".revert";
 								if (fullPickleContent === "") {
-									fullPickleContent = await spawnAsync('python', ['-m', 'pickle', filepath]);
+									fullPickleContent = await spawnAsync(pythonPath, ['-m', 'pickle', filepath]);
 									console.log("loaded");
 									oldButtonName = ".load-more";
 								}
@@ -101,7 +119,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 							console.log("revert message received");
 							try {
 								if (fullPickleToolsContent === "") {
-									fullPickleToolsContent = await spawnAsync('python', ['-m', 'pickletools', filepath]);
+									fullPickleToolsContent = await spawnAsync(pythonPath, ['-m', 'pickletools', filepath]);
 								}
 								const content = `<pre>pickle output (Full):\n${fullPickleToolsContent}</pre>`;
 								webviewPanel.webview.html = this.getPanelHTML(content);

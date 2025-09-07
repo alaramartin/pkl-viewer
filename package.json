@@ -3,6 +3,9 @@
   "displayName": "pkl-viewer",
   "description": "LEAVE BLANK",
   "version": "0.0.1",
+  "extensionDependencies": [
+    "ms-python.python"
+  ],
   "engines": {
     "vscode": "^1.102.0"
   },
