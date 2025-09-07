@@ -80,9 +80,9 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 				// get safe and quick output
 				fullPickleToolsContent = await spawnAsync(pythonPath, ['-m', 'pickletools', filepath]);
 				const content = `<pre>${fullPickleToolsContent}</pre>`;
-				webviewPanel.webview.html = this.getPanelHTML(content);
+				webviewPanel.webview.html = this.getPanelHTML(content, webviewPanel.webview);
 			} catch (err: any) {
-				webviewPanel.webview.html = this.getPanelHTML(`<span style='color:red;'>Error: ${err.message}</span>`);
+				webviewPanel.webview.html = this.getPanelHTML(`<span style='color:red;'>Error: ${err.message}</span>`, webviewPanel.webview);
 			}
 
 			// listen to message that button was clicked
@@ -101,7 +101,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 									oldButtonName = ".load-more";
 								}
 								const content = `<pre>${fullPickleContent}</pre>`;
-								webviewPanel.webview.html = this.getPanelHTML(content);
+								webviewPanel.webview.html = this.getPanelHTML(content, webviewPanel.webview);
 								console.log("set", fullPickleContent);
 								// send a message back that it was successful
 								webviewPanel.webview.postMessage({
@@ -122,7 +122,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 									fullPickleToolsContent = await spawnAsync(pythonPath, ['-m', 'pickletools', filepath]);
 								}
 								const content = `<pre>${fullPickleToolsContent}</pre>`;
-								webviewPanel.webview.html = this.getPanelHTML(content);
+								webviewPanel.webview.html = this.getPanelHTML(content, webviewPanel.webview);
 								// send a message back that it was successful
 								webviewPanel.webview.postMessage({
 									command: "success",
@@ -151,11 +151,13 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 		return {uri, dispose: () => {} };
 	}
 
-	getPanelHTML(content:string) {
-		const cssPath = vscode.Uri.joinPath(this.context.extensionUri, 'src', 'panelWebview.css');
-		const cssContent = fs.readFileSync(cssPath.fsPath, 'utf8');
-		const scriptPath = vscode.Uri.joinPath(this.context.extensionUri, 'src', 'webview.js');
-		const scriptContent = fs.readFileSync(scriptPath.fsPath, 'utf8');
+	getPanelHTML(content:string, webview:vscode.Webview) {
+		const cssUri = webview.asWebviewUri(
+			vscode.Uri.joinPath(this.context.extensionUri, 'src', 'panelWebview.css')
+		);
+		const scriptUri = webview.asWebviewUri(
+			vscode.Uri.joinPath(this.context.extensionUri, 'src', 'webview.js')
+		);
 
 		return `<!DOCTYPE html>
 		<html lang="en">
@@ -163,9 +165,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 			<meta charset="UTF-8">
 			<meta name="viewport" content="width=device-width, initial-scale=1.0">
 			<title>PKL Preview</title>
-			<style>
-				${cssContent}
-			</style>
+        	<link href="${cssUri}" rel="stylesheet" />
 		</head>
 		<body>
 			<h3>Pickled Data</h3>
@@ -177,9 +177,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 			</div>
 			<button class="revert fixed-bottom-right">Revert to basic view</button>
 			<button class="re-revert fixed-bottom-right">Go back to full view</button>
-			<script>
-				${scriptContent}
-			</script>
+			<script src="${scriptUri}"></script>
 		</body>
 		</html>`;
 	}
