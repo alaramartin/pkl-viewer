@@ -79,7 +79,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 			try {
 				// get safe and quick output
 				fullPickleToolsContent = await spawnAsync(pythonPath, ['-m', 'pickletools', filepath]);
-				const content = `<pre>${fullPickleToolsContent}</pre>`;
+				const content = fullPickleToolsContent;
 				webviewPanel.webview.html = this.getPanelHTML(content, webviewPanel.webview);
 			} catch (err: any) {
 				webviewPanel.webview.html = this.getPanelHTML(`<span style='color:red;'>Error: ${err.message}</span>`, webviewPanel.webview);
@@ -100,12 +100,14 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 									console.log("loaded");
 									oldButtonName = ".load-more";
 								}
-								const content = `<pre>${fullPickleContent}</pre>`;
-								webviewPanel.webview.html = this.getPanelHTML(content, webviewPanel.webview);
+								const content = fullPickleContent;
+								// fixme: instead of resetting all the html, send the message with the new content and modify that block
+								// webviewPanel.webview.html = this.getPanelHTML(content, webviewPanel.webview);
 								console.log("set", fullPickleContent);
 								// send a message back that it was successful
 								webviewPanel.webview.postMessage({
 									command: "success",
+									setContent: content,
 									oldButton: oldButtonName,
 									newButton: newButtonName
 								});
@@ -121,11 +123,13 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 								if (fullPickleToolsContent === "") {
 									fullPickleToolsContent = await spawnAsync(pythonPath, ['-m', 'pickletools', filepath]);
 								}
-								const content = `<pre>${fullPickleToolsContent}</pre>`;
-								webviewPanel.webview.html = this.getPanelHTML(content, webviewPanel.webview);
+								const content = fullPickleToolsContent;
+								// fixme: remove below line
+								// webviewPanel.webview.html = this.getPanelHTML(content, webviewPanel.webview);
 								// send a message back that it was successful
 								webviewPanel.webview.postMessage({
 									command: "success",
+									setContent: content,
 									oldButton: ".revert",
 									newButton: ".re-revert"
 								});
@@ -169,11 +173,11 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 		</head>
 		<body>
 			<h3>Pickled Data</h3>
-			${content}
+			<pre>${content}</pre>
 			<div class="loader"></div>
 			<div class="tooltip fixed-bottom-right">
 				<button class="load-more default-visible">Load Full Readable Pickle</button>
-				<span class="tooltiptext">Warning: This may be slow and unsafe if pickle is malicious</span>
+				<span class="tooltiptext">Warning: This may be slow, and unsafe if pickle is malicious</span>
 			</div>
 			<button class="revert fixed-bottom-right">Revert to basic view</button>
 			<button class="re-revert fixed-bottom-right">Go back to full view</button>

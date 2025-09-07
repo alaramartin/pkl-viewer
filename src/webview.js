@@ -25,6 +25,9 @@ document.addEventListener("DOMContentLoaded", function() {
         const command = data && data.command ? data.command : data;
         // if the loading worked, remove the button currently visible and replace it with a new one
         if (command === "success") {
+            // show the new content
+            const contentViewer = this.document.getElementsByTagName("pre")[0];
+            contentViewer.innerHTML = data.setContent;
             hideAllButtons();
             // stop the loading animation
             const loadingAnimation = document.querySelector(".loader");
