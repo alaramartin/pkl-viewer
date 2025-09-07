@@ -33,25 +33,34 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 			webviewPanel.webview.options = {
 				enableScripts: true
 			};
-			// helper to promisify exec
-			function execAsync(cmd: string): Promise<string> {
-				const { exec } = require('child_process');
+			// helper to promisify spawn for large output
+			function spawnAsync(cmd: string, args: string[]): Promise<string> {
+				const { spawn } = require('child_process');
 				return new Promise((resolve, reject) => {
-					exec(cmd, (error: any, stdout: any, stderr: any) => {
-						if (error) {
-							reject(error);
-							return;
+					const child = spawn(cmd, args);
+					let stdout = '';
+					let stderr = '';
+					child.stdout.on('data', (data: Buffer) => {
+						stdout += data.toString();
+					});
+					child.stderr.on('data', (data: Buffer) => {
+						stderr += data.toString();
+					});
+					child.on('close', (code: number) => {
+						if (code !== 0) {
+							reject(new Error(stderr || `Process exited with code ${code}`));
+						} else {
+							resolve(stdout);
 						}
-						if (stderr) {
-							console.error(`stderr: ${stderr}`);
-						}
-						resolve(stdout);
+					});
+					child.on('error', (err: Error) => {
+						reject(err);
 					});
 				});
 			}
 			try {
 				// get safe and quick output
-				fullPickleToolsContent = await execAsync(`python -m pickletools ${filepath}`);
+				fullPickleToolsContent = await spawnAsync('python', ['-m', 'pickletools', filepath]);
 				const content = `<pre>pickletools output (Default):\n${fullPickleToolsContent}</pre>`;
 				webviewPanel.webview.html = this.getPanelHTML(content);
 			} catch (err: any) {
@@ -69,7 +78,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 								let oldButtonName = ".re-revert";
 								const newButtonName = ".revert";
 								if (fullPickleContent === "") {
-									fullPickleContent = await execAsync(`python -m pickle ${filepath}`);
+									fullPickleContent = await spawnAsync('python', ['-m', 'pickle', filepath]);
 									console.log("loaded");
 									oldButtonName = ".load-more";
 								}
@@ -92,7 +101,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 							console.log("revert message received");
 							try {
 								if (fullPickleToolsContent === "") {
-									fullPickleToolsContent = await execAsync(`python -m pickletools ${filepath}`);
+									fullPickleToolsContent = await spawnAsync('python', ['-m', 'pickletools', filepath]);
 								}
 								const content = `<pre>pickle output (Full):\n${fullPickleToolsContent}</pre>`;
 								webviewPanel.webview.html = this.getPanelHTML(content);
@@ -143,6 +152,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 		<body>
 			<h3>pickle</h3>
 			${content}
+			<div class="loader"></div>
 			<div class="tooltip fixed-bottom-right">
 				<button class="load-more default-visible">Load Full Readable Pickle</button>
 				<span class="tooltiptext">Warning: This may be slow and unsafe if pickle is malicious</span>
