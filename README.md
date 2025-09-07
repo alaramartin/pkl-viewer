@@ -13,10 +13,10 @@ Available on [VS Code Marketplace](https://marketplace.visualstudio.com/items?it
 
 ### Examples
 Default View:
-![example1](https://raw.githubusercontent.com/alaramartin/pkl-viewer/refs/heads/main/example-pkl-default.png?token=GHSAT0AAAAAADAAQHPFPSAIHAOGBO75ZRYC2F5B2HA)
+![example1](https://raw.githubusercontent.com/alaramartin/pkl-viewer/refs/heads/main/example-pkl-default.png)
 
 Readable Format:
-![example2](https://raw.githubusercontent.com/alaramartin/pkl-viewer/refs/heads/main/example-pkl-full.png?token=GHSAT0AAAAAADAAQHPEFW5EXVGCDRHXSK2S2F5B2VQ)
+![example2](https://raw.githubusercontent.com/alaramartin/pkl-viewer/refs/heads/main/example-pkl-full.png)
 
 ## Installation
 
