@@ -1,71 +1,30 @@
-# pkl-viewer README
+# PKL Viewer
 
-This is the README for your extension "pkl-viewer". After writing up a brief description, we recommend including the following sections.
+View Python pickle (.pkl) files directly in VS Code. Defaults to a quick, safe disassembly of the pickle file and which does not execute any code. Optionally, load the file using `pickle` for a more readable format.
+
+Available on [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=alarm.pkl-viewer).
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+- Quick and safe pickle disassembly (no code execution, uses `pickletools`)
+- Option to view the pickle file in a more readable format (uses `pickle`; may be unsafe for untrusted files, beware)
+- No additional setup: activates as soon as you open a .pkl file
 
-For example if there is an image subfolder under your extension project workspace:
+### Examples
+Default View:
+![example1](https://raw.githubusercontent.com/alaramartin/pkl-viewer/refs/heads/main/example-pkl-default.png)
 
-\!\[feature X\]\(images/feature-x.png\)
+Readable Format:
+![example2](https://raw.githubusercontent.com/alaramartin/pkl-viewer/refs/heads/main/example-pkl-full.png)
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+## Installation
 
-## Requirements
+Click the "Install" button. Make sure you have the [Python extension for VS Code](https://marketplace.visualstudio.com/items?itemName=ms-python.python). Also make sure Python is installed and available in your system path.
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+## Contributing
 
-## Extension Settings
+Feel free to open issues and pull requests. I'll be regularly checking activity on the [repository](https://github.com/alaramartin/pkl-viewer)!
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+## License
 
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
-
-## Known Issues
-
-Calling out known issues can help limit users opening duplicate issues against your extension.
-
-## Release Notes
-
-Users appreciate release notes as you update your extension.
-
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+This extension is released under the MIT License. See the LICENSE file for more details.

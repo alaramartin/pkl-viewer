@@ -79,7 +79,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 			try {
 				// get safe and quick output
 				fullPickleToolsContent = await spawnAsync(pythonPath, ['-m', 'pickletools', filepath]);
-				const content = `<pre>pickletools output (Default):\n${fullPickleToolsContent}</pre>`;
+				const content = `<pre>${fullPickleToolsContent}</pre>`;
 				webviewPanel.webview.html = this.getPanelHTML(content);
 			} catch (err: any) {
 				webviewPanel.webview.html = this.getPanelHTML(`<span style='color:red;'>Error: ${err.message}</span>`);
@@ -100,7 +100,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 									console.log("loaded");
 									oldButtonName = ".load-more";
 								}
-								const content = `<pre>pickle output (Full):\n${fullPickleContent}</pre>`;
+								const content = `<pre>${fullPickleContent}</pre>`;
 								webviewPanel.webview.html = this.getPanelHTML(content);
 								console.log("set", fullPickleContent);
 								// send a message back that it was successful
@@ -121,7 +121,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 								if (fullPickleToolsContent === "") {
 									fullPickleToolsContent = await spawnAsync(pythonPath, ['-m', 'pickletools', filepath]);
 								}
-								const content = `<pre>pickle output (Full):\n${fullPickleToolsContent}</pre>`;
+								const content = `<pre>${fullPickleToolsContent}</pre>`;
 								webviewPanel.webview.html = this.getPanelHTML(content);
 								// send a message back that it was successful
 								webviewPanel.webview.postMessage({
@@ -168,15 +168,15 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 			</style>
 		</head>
 		<body>
-			<h3>pickle</h3>
+			<h3>Pickled Data</h3>
 			${content}
 			<div class="loader"></div>
 			<div class="tooltip fixed-bottom-right">
 				<button class="load-more default-visible">Load Full Readable Pickle</button>
 				<span class="tooltiptext">Warning: This may be slow and unsafe if pickle is malicious</span>
 			</div>
-			<button class="revert fixed-bottom-right">Revert to pickletools view</button>
-			<button class="re-revert fixed-bottom-right">Go back to pickle view</button>
+			<button class="revert fixed-bottom-right">Revert to basic view</button>
+			<button class="re-revert fixed-bottom-right">Go back to full view</button>
 			<script>
 				${scriptContent}
 			</script>
