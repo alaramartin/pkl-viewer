@@ -1,6 +1,4 @@
-.load-more {
-    bottom: 50px;
-    right: 50px;
+button {
     background: #384d3e;
     color: white;
     border: #273635;
@@ -9,11 +7,16 @@
     border-radius: 5px;
     cursor: pointer;
 }
-.tooltip {  
-    position: relative;  
+.fixed-bottom-right {
+    position: fixed;
+    bottom: 50px;
+    right: 50px;
+    z-index: 1001;
+}
+.tooltip:not(.fixed-bottom-right) {
+    position: relative;
     display: inline-block;
-}  
-
+}
 .tooltip .tooltiptext {  
     visibility: hidden;  
     width: 200px;  
@@ -45,4 +48,12 @@
     border-width: 5px;
     border-style: solid;
     border-color: #333 transparent transparent transparent;
+}
+.load-more,
+.revert,
+.re-revert {
+    display: none;
+}
+.load-more.default-visible {
+    display: inline-block;
 }

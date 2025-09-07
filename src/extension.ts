@@ -25,6 +25,10 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 		// get the filepath of the new focused file and check if it's pkl
 		let filepath = document.uri.fsPath;
 		if (filepath.includes(".pkl")) {
+			// save the full pickle content if it gets loaded once
+			let fullPickleContent = "";
+			let fullPickleToolsContent = "";
+
 			console.log("this is a .pkl file");
 			webviewPanel.webview.options = {
 				enableScripts: true
@@ -47,8 +51,8 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 			}
 			try {
 				// get safe and quick output
-				const pickletoolsOutput = await execAsync(`python -m pickletools ${filepath}`);
-				const content = `<pre>Default pickletools output:\n${pickletoolsOutput}</pre>`;
+				fullPickleToolsContent = await execAsync(`python -m pickletools ${filepath}`);
+				const content = `<pre>pickletools output (Default):\n${fullPickleToolsContent}</pre>`;
 				webviewPanel.webview.html = this.getPanelHTML(content);
 			} catch (err: any) {
 				webviewPanel.webview.html = this.getPanelHTML(`<span style='color:red;'>Error: ${err.message}</span>`);
@@ -62,18 +66,48 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 							console.log("load more message received");
 							// use -mpickle and update the html
 							try {
-								const pickleOutput = await execAsync(`python -m pickle ${filepath}`);
-								const content = `<pre>Full pickle output:\n${pickleOutput}</pre>`;
+								let oldButtonName = ".re-revert";
+								const newButtonName = ".revert";
+								if (fullPickleContent === "") {
+									fullPickleContent = await execAsync(`python -m pickle ${filepath}`);
+									console.log("loaded");
+									oldButtonName = ".load-more";
+								}
+								const content = `<pre>pickle output (Full):\n${fullPickleContent}</pre>`;
 								webviewPanel.webview.html = this.getPanelHTML(content);
+								console.log("set", fullPickleContent);
 								// send a message back that it was successful
 								webviewPanel.webview.postMessage({
-									command: "success"
+									command: "success",
+									oldButton: oldButtonName,
+									newButton: newButtonName
 								});
 							} catch (err: any) {
 								// tell user there is an error, then stay with original pickletools
 								console.log(err);
 								vscode.window.showInformationMessage("There was an error loading the full Pickle file.");
 							}
+							break;
+						case "revert":
+							console.log("revert message received");
+							try {
+								if (fullPickleToolsContent === "") {
+									fullPickleToolsContent = await execAsync(`python -m pickletools ${filepath}`);
+								}
+								const content = `<pre>pickle output (Full):\n${fullPickleToolsContent}</pre>`;
+								webviewPanel.webview.html = this.getPanelHTML(content);
+								// send a message back that it was successful
+								webviewPanel.webview.postMessage({
+									command: "success",
+									oldButton: ".revert",
+									newButton: ".re-revert"
+								});
+							} catch (err: any) {
+								// tell user there is an error, then stay with original pickletools
+								console.log(err);
+								vscode.window.showInformationMessage("There was an error loading the full Pickle file.");
+							}
+							break;
 					}
 				},
 				undefined,
@@ -109,10 +143,12 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 		<body>
 			<h3>pickle</h3>
 			${content}
-			<div class="tooltip" style="position: fixed; bottom: 50px; right: 50px;">
-                <button class="load-more">Load Full Readable Pickle</button>
-                <span class="tooltiptext">Warning: This may be slow and unsafe if pickle is malicious</span>
-            </div>
+			<div class="tooltip fixed-bottom-right">
+				<button class="load-more default-visible">Load Full Readable Pickle</button>
+				<span class="tooltiptext">Warning: This may be slow and unsafe if pickle is malicious</span>
+			</div>
+			<button class="revert fixed-bottom-right">Revert to pickletools view</button>
+			<button class="re-revert fixed-bottom-right">Go back to pickle view</button>
 			<script>
 				${scriptContent}
 			</script>
