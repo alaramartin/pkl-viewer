@@ -41,7 +41,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 	):Promise<void> {
 		// get the filepath of the new focused file and check if it's pkl
 		let filepath = document.uri.fsPath;
-		if (filepath.includes(".pkl")) {
+		if (filepath.includes(".pkl") || filepath.includes(".pickle")) {
 			// save the full pickle content if it gets loaded once
 			let fullPickleContent = "";
 			let fullPickleToolsContent = "";
