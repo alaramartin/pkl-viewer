@@ -101,8 +101,6 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 									oldButtonName = ".load-more";
 								}
 								const content = fullPickleContent;
-								// fixme: instead of resetting all the html, send the message with the new content and modify that block
-								// webviewPanel.webview.html = this.getPanelHTML(content, webviewPanel.webview);
 								console.log("set", fullPickleContent);
 								// send a message back that it was successful
 								webviewPanel.webview.postMessage({
@@ -124,8 +122,6 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 									fullPickleToolsContent = await spawnAsync(pythonPath, ['-m', 'pickletools', filepath]);
 								}
 								const content = fullPickleToolsContent;
-								// fixme: remove below line
-								// webviewPanel.webview.html = this.getPanelHTML(content, webviewPanel.webview);
 								// send a message back that it was successful
 								webviewPanel.webview.postMessage({
 									command: "success",
