@@ -2,7 +2,7 @@
 
 View Python pickle (.pkl) files directly in VS Code. Defaults to a quick, safe disassembly of the pickle file which does not execute any code. Optionally, load the file using `pickle` for a more readable format.
 
-Available on [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=alarm.pkl-viewer).
+Available on [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=alarm.pkl-viewer) and [OpenVSX](https://open-vsx.org/extension/alarm/pkl-viewer).
 
 ## Features
 
