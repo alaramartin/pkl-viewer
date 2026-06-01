@@ -2,7 +2,7 @@
   "name": "pkl-viewer",
   "displayName": "PKL Viewer",
   "description": "View Python pickle (.pkl) files directly in the VS Code editor.",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "publisher": "alarm",
   "icon": "logo.png",
   "repository": {
