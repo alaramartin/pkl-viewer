@@ -118,12 +118,13 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 		let fullPickleToolsContent = "";
 		const pythonPath = await getPythonPath();
 
-		// Foundation for the upcoming tree explorer (PLAN.md #1): one long-lived
-		// sidecar process per open editor, keeping the unpickled object resident so
-		// expansion doesn't re-parse the file. Not wired into rendering yet — that
-		// lands with the tree view itself — but its lifecycle (spawn/open, kill on
-		// dispose or cancellation) is real and testable now.
+		// Tree explorer (PLAN.md #1.1): one long-lived sidecar process per open editor,
+		// keeping the unpickled object resident so expanding a subtree is a lookup rather
+		// than a full re-parse. The webview drives it lazily via "treeExpand" messages once
+		// it signals "treeReady"; the raw pickletools/pickle view below stays reachable via
+		// a toggle regardless of whether the sidecar is available.
 		let sidecar: PickleSidecar | undefined;
+		let sidecarRoot: Awaited<ReturnType<PickleSidecar['open']>> | undefined;
 		const disposeSidecar = () => {
 			sidecar?.dispose();
 			sidecar = undefined;
@@ -132,10 +133,10 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 			try {
 				const scriptPath = path.join(this.context.extensionUri.fsPath, 'src', 'py', 'sidecar.py');
 				sidecar = new PickleSidecar(pythonPath, scriptPath);
-				await sidecar.open(filepath);
+				sidecarRoot = await sidecar.open(filepath);
 			} catch {
-				// Sidecar is inert infrastructure right now; a failure to spawn it
-				// (e.g. an unusual Python setup) must not break the existing view.
+				// A failure to spawn the sidecar (e.g. an unusual Python setup) must not
+				// break the existing raw view; the webview just hides the tree toggle.
 				disposeSidecar();
 			}
 		}
@@ -180,6 +181,38 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 		webviewPanel.webview.onDidReceiveMessage(
 			async message => {
 				switch (message.command) {
+					case "treeReady":
+						if (sidecar && sidecarRoot) {
+							webviewPanel.webview.postMessage({ command: "treeInit", root: sidecarRoot });
+						} else {
+							webviewPanel.webview.postMessage({ command: "treeUnavailable" });
+						}
+						break;
+					case "treeExpand":
+						try {
+							if (!sidecar) {
+								throw new Error("sidecar is not available");
+							}
+							const result = await sidecar.expand(message.handle, message.offset, message.limit);
+							webviewPanel.webview.postMessage({
+								command: "treeExpandResult",
+								requestId: message.requestId,
+								total: result.total,
+								nodes: result.nodes,
+							});
+						} catch (err: any) {
+							webviewPanel.webview.postMessage({
+								command: "treeExpandError",
+								requestId: message.requestId,
+								message: err.message ?? String(err),
+							});
+						}
+						break;
+					case "copyToClipboard":
+						if (typeof message.text === "string") {
+							await vscode.env.clipboard.writeText(message.text);
+						}
+						break;
 					case "load more":
 						// use -mpickle and update the html
 						try {
@@ -328,7 +361,14 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 		</head>
 		<body>
 			<h3>Pickled Data</h3>
-			<pre>${content}</pre>
+			<button id="toggle-view" class="fixed-top-right">Show raw disassembly</button>
+			<div id="tree-view">
+				<div id="breadcrumb" class="breadcrumb"></div>
+				<div id="tree-container" class="tree-container"></div>
+			</div>
+			<div id="raw-view" style="display:none;">
+				<pre>${content}</pre>
+			</div>
 			<div class="loader"></div>
 			<div class="tooltip fixed-bottom-right">
 				<button class="load-more default-visible">Load Full Readable Pickle</button>
