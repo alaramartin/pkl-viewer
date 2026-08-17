@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
+import { detectFileKind } from './core/sniff';
+import { escapeHtml } from './core/escape';
 
 // get either python or python3 or whatever the user uses to increase compatibility
 async function getPythonPath(): Promise<string> {
@@ -17,6 +18,18 @@ async function getPythonPath(): Promise<string> {
     // fallback to python3
     return "python3";
 }
+
+// extensions (including compound ones) this viewer claims. path.extname alone can't express
+// "*.pkl.gz", so check suffixes explicitly instead of substring-matching ".pkl" anywhere in the path.
+const PKL_SUFFIXES = ['.pkl', '.pickle', '.pkl.gz', '.pkl.bz2', '.pkl.xz'];
+
+function isPklPath(filepath: string): boolean {
+	const lower = filepath.toLowerCase();
+	return PKL_SUFFIXES.some(suffix => lower.endsWith(suffix));
+}
+
+const SUPPRESS_APPLE_PKL_NOTICE_KEY = 'pklViewer.suppressApplePklNotice';
+const APPLE_PKL_EXTENSION_URL = 'https://marketplace.visualstudio.com/items?itemName=apple.pkl-vscode';
 
 class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.CustomDocument> {
 	public static register(context: vscode.ExtensionContext): vscode.Disposable {
@@ -41,106 +54,148 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 	):Promise<void> {
 		// get the filepath of the new focused file and check if it's pkl
 		let filepath = document.uri.fsPath;
-		if (filepath.includes(".pkl") || filepath.includes(".pickle")) {
-			// save the full pickle content if it gets loaded once
-			let fullPickleContent = "";
-			let fullPickleToolsContent = "";
-			const pythonPath = await getPythonPath();
+		if (!isPklPath(filepath)) {
+			return;
+		}
 
-			console.log("this is a .pkl file");
-			webviewPanel.webview.options = {
-				enableScripts: true
-			};
-			// helper to promisify spawn for large output
-			function spawnAsync(cmd: string, args: string[]): Promise<string> {
-				const { spawn } = require('child_process');
-				return new Promise((resolve, reject) => {
-					const child = spawn(cmd, args);
-					let stdout = '';
-					let stderr = '';
-					child.stdout.on('data', (data: Buffer) => {
-						stdout += data.toString();
-					});
-					child.stderr.on('data', (data: Buffer) => {
-						stderr += data.toString();
-					});
-					child.on('close', (code: number) => {
-						if (code !== 0) {
-							reject(new Error(stderr || `Process exited with code ${code}`));
-						} else {
-							resolve(stdout);
-						}
-					});
-					child.on('error', (err: Error) => {
-						reject(err);
-					});
-				});
-			}
-			try {
-				// get safe and quick output
-				fullPickleToolsContent = await spawnAsync(pythonPath, ['-m', 'pickletools', filepath]);
-				const content = fullPickleToolsContent;
-				webviewPanel.webview.html = this.getPanelHTML(content, webviewPanel.webview);
-			} catch (err: any) {
-				webviewPanel.webview.html = this.getPanelHTML(`<span style='color:red;'>Error: ${err.message}</span>`, webviewPanel.webview);
-			}
+		webviewPanel.webview.options = {
+			enableScripts: true,
+			localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, 'src')]
+		};
 
-			// listen to message that button was clicked
+		const kind = await detectFileKind(document.uri);
+
+		if (kind === 'applePkl' && !this.context.workspaceState.get(SUPPRESS_APPLE_PKL_NOTICE_KEY, false)) {
+			this.renderApplePklNotice(webviewPanel);
 			webviewPanel.webview.onDidReceiveMessage(
 				async message => {
 					switch (message.command) {
-						case "load more":
-							console.log("load more message received");
-							// use -mpickle and update the html
-							try {
-								let oldButtonName = ".re-revert";
-								const newButtonName = ".revert";
-								if (fullPickleContent === "") {
-									fullPickleContent = await spawnAsync(pythonPath, ['-m', 'pickle', filepath]);
-									console.log("loaded");
-									oldButtonName = ".load-more";
-								}
-								const content = fullPickleContent;
-								console.log("set", fullPickleContent);
-								// send a message back that it was successful
-								webviewPanel.webview.postMessage({
-									command: "success",
-									setContent: content,
-									oldButton: oldButtonName,
-									newButton: newButtonName
-								});
-							} catch (err: any) {
-								// tell user there is an error, then stay with original pickletools
-								console.log(err);
-								vscode.window.showInformationMessage("There was an error loading the full Pickle file.");
-							}
+						case "openAsText":
+							await vscode.commands.executeCommand('vscode.openWith', document.uri, 'default');
+							webviewPanel.dispose();
 							break;
-						case "revert":
-							console.log("revert message received");
-							try {
-								if (fullPickleToolsContent === "") {
-									fullPickleToolsContent = await spawnAsync(pythonPath, ['-m', 'pickletools', filepath]);
-								}
-								const content = fullPickleToolsContent;
-								// send a message back that it was successful
-								webviewPanel.webview.postMessage({
-									command: "success",
-									setContent: content,
-									oldButton: ".revert",
-									newButton: ".re-revert"
-								});
-							} catch (err: any) {
-								// tell user there is an error, then stay with original pickletools
-								console.log(err);
-								vscode.window.showInformationMessage("There was an error loading the full Pickle file.");
-							}
+						case "viewAsPickleAnyway":
+							await this.renderPickleView(document, webviewPanel);
+							break;
+						case "dontAskAgain":
+							await this.context.workspaceState.update(SUPPRESS_APPLE_PKL_NOTICE_KEY, true);
 							break;
 					}
 				},
 				undefined,
 				this.context.subscriptions
 			);
+			return;
 		}
+
+		if (kind === 'unknown') {
+			this.renderUnknownNotice(webviewPanel);
+			webviewPanel.webview.onDidReceiveMessage(
+				async message => {
+					if (message.command === "viewAsPickleAnyway") {
+						await this.renderPickleView(document, webviewPanel);
+					}
+				},
+				undefined,
+				this.context.subscriptions
+			);
+			return;
+		}
+
+		await this.renderPickleView(document, webviewPanel);
+	}
+
+	// runs the actual pickletools/pickle disassembly flow and wires up its message handlers
+	async renderPickleView(document: vscode.CustomDocument, webviewPanel: vscode.WebviewPanel): Promise<void> {
+		const filepath = document.uri.fsPath;
+		// save the full pickle content if it gets loaded once
+		let fullPickleContent = "";
+		let fullPickleToolsContent = "";
+		const pythonPath = await getPythonPath();
+
+		// helper to promisify spawn for large output
+		function spawnAsync(cmd: string, args: string[]): Promise<string> {
+			const { spawn } = require('child_process');
+			return new Promise((resolve, reject) => {
+				const child = spawn(cmd, args);
+				let stdout = '';
+				let stderr = '';
+				child.stdout.on('data', (data: Buffer) => {
+					stdout += data.toString();
+				});
+				child.stderr.on('data', (data: Buffer) => {
+					stderr += data.toString();
+				});
+				child.on('close', (code: number) => {
+					if (code !== 0) {
+						reject(new Error(stderr || `Process exited with code ${code}`));
+					} else {
+						resolve(stdout);
+					}
+				});
+				child.on('error', (err: Error) => {
+					reject(err);
+				});
+			});
+		}
+		try {
+			// get safe and quick output
+			fullPickleToolsContent = await spawnAsync(pythonPath, ['-m', 'pickletools', filepath]);
+			const content = fullPickleToolsContent;
+			webviewPanel.webview.html = this.getPanelHTML(escapeHtml(content), webviewPanel.webview);
+		} catch (err: any) {
+			webviewPanel.webview.html = this.getPanelHTML(`<span style='color:red;'>Error: ${escapeHtml(err.message)}</span>`, webviewPanel.webview);
+		}
+
+		// listen to message that button was clicked
+		webviewPanel.webview.onDidReceiveMessage(
+			async message => {
+				switch (message.command) {
+					case "load more":
+						// use -mpickle and update the html
+						try {
+							let oldButtonName = ".re-revert";
+							const newButtonName = ".revert";
+							if (fullPickleContent === "") {
+								fullPickleContent = await spawnAsync(pythonPath, ['-m', 'pickle', filepath]);
+								oldButtonName = ".load-more";
+							}
+							const content = fullPickleContent;
+							// sent as plain text; webview.js assigns it via textContent, not innerHTML
+							webviewPanel.webview.postMessage({
+								command: "success",
+								setContent: content,
+								oldButton: oldButtonName,
+								newButton: newButtonName
+							});
+						} catch (err: any) {
+							// tell user there is an error, then stay with original pickletools
+							vscode.window.showInformationMessage("There was an error loading the full Pickle file.");
+						}
+						break;
+					case "revert":
+						try {
+							if (fullPickleToolsContent === "") {
+								fullPickleToolsContent = await spawnAsync(pythonPath, ['-m', 'pickletools', filepath]);
+							}
+							const content = fullPickleToolsContent;
+							// sent as plain text; webview.js assigns it via textContent, not innerHTML
+							webviewPanel.webview.postMessage({
+								command: "success",
+								setContent: content,
+								oldButton: ".revert",
+								newButton: ".re-revert"
+							});
+						} catch (err: any) {
+							// tell user there is an error, then stay with original pickletools
+							vscode.window.showInformationMessage("There was an error loading the full Pickle file.");
+						}
+						break;
+				}
+			},
+			undefined,
+			this.context.subscriptions
+		);
 	}
 
 	// required method for a custom editor
@@ -151,6 +206,79 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 		return {uri, dispose: () => {} };
 	}
 
+	private getNoticeCssUri(webview: vscode.Webview): vscode.Uri {
+		return webview.asWebviewUri(
+			vscode.Uri.joinPath(this.context.extensionUri, 'src', 'panelWebview.css')
+		);
+	}
+
+	renderApplePklNotice(webviewPanel: vscode.WebviewPanel): void {
+		const cssUri = this.getNoticeCssUri(webviewPanel.webview);
+		const nonce = getNonce();
+		webviewPanel.webview.html = `<!DOCTYPE html>
+		<html lang="en">
+		<head>
+			<meta charset="UTF-8">
+			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webviewPanel.webview.cspSource}; script-src 'nonce-${nonce}';">
+			<meta name="viewport" content="width=device-width, initial-scale=1.0">
+			<title>PKL Preview</title>
+			<link href="${cssUri}" rel="stylesheet" />
+		</head>
+		<body>
+			<h3>This looks like an Apple Pkl configuration file, not a Python pickle.</h3>
+			<p>
+				PKL Viewer disassembles Python pickle files. This file looks like it's written in
+				<a href="${APPLE_PKL_EXTENSION_URL}">Apple's Pkl configuration language</a>, which uses the
+				same <code>.pkl</code> extension. The
+				<a href="${APPLE_PKL_EXTENSION_URL}">official Pkl extension</a> is the right tool for that.
+			</p>
+			<button id="open-as-text">Open as text</button>
+			<button id="view-anyway">View as pickle anyway</button>
+			<p><label><input type="checkbox" id="dont-ask-again" /> Don't ask again for this workspace</label></p>
+			<script nonce="${nonce}">
+				const vscode = acquireVsCodeApi();
+				document.getElementById('open-as-text').addEventListener('click', () => {
+					vscode.postMessage({ command: 'openAsText' });
+				});
+				document.getElementById('view-anyway').addEventListener('click', () => {
+					vscode.postMessage({ command: 'viewAsPickleAnyway' });
+				});
+				document.getElementById('dont-ask-again').addEventListener('change', (e) => {
+					if (e.target.checked) {
+						vscode.postMessage({ command: 'dontAskAgain' });
+					}
+				});
+			</script>
+		</body>
+		</html>`;
+	}
+
+	renderUnknownNotice(webviewPanel: vscode.WebviewPanel): void {
+		const cssUri = this.getNoticeCssUri(webviewPanel.webview);
+		const nonce = getNonce();
+		webviewPanel.webview.html = `<!DOCTYPE html>
+		<html lang="en">
+		<head>
+			<meta charset="UTF-8">
+			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webviewPanel.webview.cspSource}; script-src 'nonce-${nonce}';">
+			<meta name="viewport" content="width=device-width, initial-scale=1.0">
+			<title>PKL Preview</title>
+			<link href="${cssUri}" rel="stylesheet" />
+		</head>
+		<body>
+			<h3>This doesn't look like a Python pickle file.</h3>
+			<p>PKL Viewer couldn't recognize the start of this file as pickle data. It may be corrupted, encrypted, or in a different format entirely.</p>
+			<button id="view-anyway">Try viewing it as a pickle anyway</button>
+			<script nonce="${nonce}">
+				const vscode = acquireVsCodeApi();
+				document.getElementById('view-anyway').addEventListener('click', () => {
+					vscode.postMessage({ command: 'viewAsPickleAnyway' });
+				});
+			</script>
+		</body>
+		</html>`;
+	}
+
 	getPanelHTML(content:string, webview:vscode.Webview) {
 		const cssUri = webview.asWebviewUri(
 			vscode.Uri.joinPath(this.context.extensionUri, 'src', 'panelWebview.css')
@@ -158,11 +286,13 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 		const scriptUri = webview.asWebviewUri(
 			vscode.Uri.joinPath(this.context.extensionUri, 'src', 'webview.js')
 		);
+		const nonce = getNonce();
 
 		return `<!DOCTYPE html>
 		<html lang="en">
 		<head>
 			<meta charset="UTF-8">
+			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
 			<meta name="viewport" content="width=device-width, initial-scale=1.0">
 			<title>PKL Preview</title>
         	<link href="${cssUri}" rel="stylesheet" />
@@ -177,10 +307,19 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 			</div>
 			<button class="revert fixed-bottom-right">Revert to basic view</button>
 			<button class="re-revert fixed-bottom-right">Go back to full view</button>
-			<script src="${scriptUri}"></script>
+			<script nonce="${nonce}" src="${scriptUri}"></script>
 		</body>
 		</html>`;
 	}
+}
+
+function getNonce(): string {
+	let text = '';
+	const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+	for (let i = 0; i < 32; i++) {
+		text += possible.charAt(Math.floor(Math.random() * possible.length));
+	}
+	return text;
 }
 
 // called when extension is activated

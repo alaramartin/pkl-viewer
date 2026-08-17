@@ -27,7 +27,7 @@ document.addEventListener("DOMContentLoaded", function() {
         if (command === "success") {
             // show the new content
             const contentViewer = this.document.getElementsByTagName("pre")[0];
-            contentViewer.innerHTML = data.setContent;
+            contentViewer.textContent = data.setContent;
             hideAllButtons();
             // stop the loading animation
             const loadingAnimation = document.querySelector(".loader");
