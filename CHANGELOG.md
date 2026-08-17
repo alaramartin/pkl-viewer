@@ -6,6 +6,8 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-16
+
 - Fixed: `.pkl` files belonging to Apple's Pkl configuration language no longer open as a binary
   pickle disassembly. The extension now sniffs file content before parsing and shows a plain
   notice with an option to open as text or view as pickle anyway.
