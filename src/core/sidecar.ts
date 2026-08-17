@@ -27,11 +27,15 @@ export interface SidecarSearchHit {
 	handle: number;
 	path: string;
 	preview: string;
+	/** Handles to expand, top-down, between the search root and this hit's parent. */
+	ancestors: number[];
 }
 
 export interface SidecarSearchResult {
 	hits: SidecarSearchHit[];
 	truncated: boolean;
+	/** Nodes actually walked before hitting the limit or the max-nodes cap. */
+	visited: number;
 }
 
 type PendingEntry = { resolve: (value: unknown) => void; reject: (err: Error) => void };
@@ -114,8 +118,13 @@ export class PickleSidecar {
 		return this.request('expand', { handle, offset, limit });
 	}
 
-	search(query: string, scope: 'keys' | 'values' | 'keys+values' = 'keys+values', limit = 100): Promise<SidecarSearchResult> {
-		return this.request('search', { query, scope, limit });
+	search(
+		query: string,
+		scope: 'keys' | 'values' | 'keys+values' = 'keys+values',
+		limit = 100,
+		root = 0
+	): Promise<SidecarSearchResult> {
+		return this.request('search', { query, scope, limit, root });
 	}
 
 	/** Kills the subprocess and rejects any in-flight requests. Idempotent. */

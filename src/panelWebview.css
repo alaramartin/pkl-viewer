@@ -86,7 +86,68 @@ button {
 
 /* Tree explorer (PLAN.md 1.1) */
 
+#tree-view {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.tree-search-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    flex: 0 0 auto;
+}
+.tree-search-bar input[type="text"] {
+    flex: 1 1 auto;
+    background: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border, transparent);
+    padding: 4px 6px;
+    border-radius: 3px;
+}
+.tree-search-bar select {
+    background: var(--vscode-dropdown-background);
+    color: var(--vscode-dropdown-foreground);
+    border: 1px solid var(--vscode-dropdown-border, transparent);
+    padding: 3px;
+    border-radius: 3px;
+}
+.tree-search-status {
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+    white-space: nowrap;
+}
+
+.tree-search-results {
+    flex: 0 0 auto;
+    max-height: 40vh;
+    overflow-y: auto;
+    border-bottom: 1px solid var(--vscode-panel-border, transparent);
+}
+.tree-search-hit {
+    padding: 4px 10px;
+    cursor: pointer;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.tree-search-hit:hover {
+    background: var(--vscode-list-hoverBackground);
+}
+.tree-search-hit .hit-path {
+    color: var(--vscode-symbolIcon-fieldForeground, var(--vscode-editor-foreground));
+    font-weight: 600;
+    margin-right: 8px;
+}
+.tree-search-hit .hit-preview {
+    color: var(--vscode-descriptionForeground);
+}
+
 .breadcrumb {
+    flex: 0 0 auto;
     padding: 6px 10px;
     font-size: 12px;
     color: var(--vscode-descriptionForeground);
@@ -109,7 +170,8 @@ button {
     position: relative;
     overflow-y: auto;
     overflow-x: hidden;
-    height: calc(100vh - 40px);
+    flex: 1 1 auto;
+    min-height: 0;
     font-family: var(--vscode-editor-font-family, monospace);
     font-size: var(--vscode-editor-font-size, 13px);
 }

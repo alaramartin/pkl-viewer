@@ -71,7 +71,7 @@ function showTreeView() {
 	const treeView = document.getElementById('tree-view');
 	const toggleBtn = document.getElementById('toggle-view');
 	if (treeView) {
-		treeView.style.display = 'block';
+		treeView.style.display = 'flex';
 	}
 	if (rawView) {
 		rawView.style.display = 'none';
@@ -122,6 +122,11 @@ function forceRawView() {
 function setupTreeView() {
 	const treeContainer = document.getElementById('tree-container');
 	const breadcrumbEl = document.getElementById('breadcrumb');
+	const searchInput = /** @type {HTMLInputElement | null} */ (document.getElementById('tree-search-input'));
+	const searchScope = /** @type {HTMLSelectElement | null} */ (document.getElementById('tree-search-scope'));
+	const searchSubtree = /** @type {HTMLInputElement | null} */ (document.getElementById('tree-search-subtree'));
+	const searchStatus = document.getElementById('tree-search-status');
+	const searchResults = document.getElementById('tree-search-results');
 	if (!treeContainer || !breadcrumbEl) {
 		return;
 	}
@@ -130,13 +135,38 @@ function setupTreeView() {
 	/** @type {Map<number, {resolve: (v: any) => void, reject: (e: Error) => void}>} */
 	const pending = new Map();
 
+	// Every request/response pair (expand or search) is keyed by requestId, resolved
+	// against whatever the extension host echoes back for that id.
+	function post(command, params) {
+		const requestId = nextRequestId++;
+		return new Promise((resolve, reject) => {
+			pending.set(requestId, { resolve, reject });
+			vscode.postMessage({ command, requestId, ...params });
+		});
+	}
+	function settle(data, isError) {
+		const entry = pending.get(data.requestId);
+		if (!entry) {
+			return;
+		}
+		pending.delete(data.requestId);
+		if (isError) {
+			entry.reject(new Error(data.message));
+		} else {
+			entry.resolve(data);
+		}
+	}
+
 	const tree = new Tree(treeContainer, breadcrumbEl, {
 		requestExpand(handle, offset, limit) {
-			const requestId = nextRequestId++;
-			return new Promise((resolve, reject) => {
-				pending.set(requestId, { resolve, reject });
-				vscode.postMessage({ command: 'treeExpand', requestId, handle, offset, limit });
-			});
+			return post('treeExpand', { handle, offset, limit }).then((data) => ({ total: data.total, nodes: data.nodes }));
+		},
+		requestSearch(query, matchScope, root, limit) {
+			return post('treeSearch', { query, matchScope, root, limit }).then((data) => ({
+				hits: data.hits,
+				truncated: data.truncated,
+				visited: data.visited,
+			}));
 		},
 		copyToClipboard(text) {
 			vscode.postMessage({ command: 'copyToClipboard', text });
@@ -155,24 +185,100 @@ function setupTreeView() {
 			case 'treeUnavailable':
 				forceRawView();
 				break;
-			case 'treeExpandResult': {
-				const entry = pending.get(data.requestId);
-				if (entry) {
-					pending.delete(data.requestId);
-					entry.resolve({ total: data.total, nodes: data.nodes });
-				}
+			case 'treeExpandResult':
+			case 'treeSearchResult':
+				settle(data, false);
 				break;
-			}
-			case 'treeExpandError': {
-				const entry = pending.get(data.requestId);
-				if (entry) {
-					pending.delete(data.requestId);
-					entry.reject(new Error(data.message));
-				}
+			case 'treeExpandError':
+			case 'treeSearchError':
+				settle(data, true);
 				break;
-			}
 		}
 	});
 
+	setupSearch(tree, { searchInput, searchScope, searchSubtree, searchStatus, searchResults });
+
 	vscode.postMessage({ command: 'treeReady' });
+}
+
+// ---- search (PLAN.md 1.2) ----
+
+/**
+ * @param {import('./tree/tree').Tree} tree
+ * @param {{searchInput: HTMLInputElement | null, searchScope: HTMLSelectElement | null,
+ *   searchSubtree: HTMLInputElement | null, searchStatus: HTMLElement | null,
+ *   searchResults: HTMLElement | null}} els
+ */
+function setupSearch(tree, els) {
+	const { searchInput, searchScope, searchSubtree, searchStatus, searchResults } = els;
+	if (!searchInput || !searchScope || !searchSubtree || !searchStatus || !searchResults) {
+		return;
+	}
+
+	let debounceTimer;
+	let requestSeq = 0;
+
+	function runSearch() {
+		const query = searchInput.value.trim();
+		const mySeq = ++requestSeq;
+		if (!query) {
+			searchResults.style.display = 'none';
+			searchResults.textContent = '';
+			searchStatus.textContent = '';
+			return;
+		}
+		searchStatus.textContent = 'Searching…';
+		const matchScope = /** @type {'keys' | 'values' | 'keys+values'} */ (searchScope.value);
+		tree.runSearch(query, matchScope, searchSubtree.checked).then(
+			(result) => {
+				if (mySeq !== requestSeq) {
+					return; // a newer search superseded this one
+				}
+				renderResults(result);
+			},
+			(err) => {
+				if (mySeq !== requestSeq) {
+					return;
+				}
+				searchStatus.textContent = `Search error: ${err.message}`;
+				searchResults.style.display = 'none';
+			}
+		);
+	}
+
+	function renderResults(result) {
+		searchResults.textContent = '';
+		if (result.hits.length === 0) {
+			searchStatus.textContent = 'No matches';
+			searchResults.style.display = 'none';
+			return;
+		}
+		searchStatus.textContent = result.truncated
+			? `${result.hits.length}+ matches (stopped after ${result.visited} nodes)`
+			: `${result.hits.length} match${result.hits.length === 1 ? '' : 'es'}`;
+		for (const hit of result.hits) {
+			const row = document.createElement('div');
+			row.className = 'tree-search-hit';
+			const path = document.createElement('span');
+			path.className = 'hit-path';
+			path.textContent = hit.path;
+			const preview = document.createElement('span');
+			preview.className = 'hit-preview';
+			preview.textContent = hit.preview;
+			row.appendChild(path);
+			row.appendChild(preview);
+			row.addEventListener('click', () => {
+				tree.revealHit(result.rootHandle, hit);
+			});
+			searchResults.appendChild(row);
+		}
+		searchResults.style.display = 'block';
+	}
+
+	searchInput.addEventListener('input', () => {
+		clearTimeout(debounceTimer);
+		debounceTimer = setTimeout(runSearch, 250);
+	});
+	searchScope.addEventListener('change', runSearch);
+	searchSubtree.addEventListener('change', runSearch);
 }

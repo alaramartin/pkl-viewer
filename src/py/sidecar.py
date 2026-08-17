@@ -32,18 +32,34 @@ DEFAULT_SEARCH_MAX_NODES = 20000
 class HandleRegistry:
     """Maps integer handles to live Python objects, and tracks the parent
     handle each object was discovered through so cycles can be detected by
-    walking the ancestor chain."""
+    walking the ancestor chain.
+
+    A handle is stable for the life of the process: registering the same
+    object twice (by identity) returns the same handle, whether it's
+    discovered again via `expand` (revisited through pagination) or via
+    `search` (an independent traversal). Callers -- notably the webview's
+    "jump to search hit" flow -- expand a node via one RPC and are handed a
+    handle to look up from a *different* RPC; if re-registering minted a new
+    handle every time, those handles would never match up. Objects here stay
+    alive for as long as they're reachable from the root the file was opened
+    with, so `id()` can't be recycled out from under a live entry."""
 
     def __init__(self):
         self.objects = {}
         self.parents = {}
+        self.by_identity = {}
         self.next_handle = 0
 
     def register(self, obj, parent=None):
+        key = id(obj)
+        existing = self.by_identity.get(key)
+        if existing is not None:
+            return existing
         handle = self.next_handle
         self.next_handle += 1
         self.objects[handle] = obj
         self.parents[handle] = parent
+        self.by_identity[key] = handle
         return handle
 
     def ancestor_handle_for(self, from_handle, obj):
@@ -176,11 +192,16 @@ class Sidecar:
         scope = params.get("scope", "keys+values")
         limit = params.get("limit", 100)
         max_nodes = params.get("max_nodes", DEFAULT_SEARCH_MAX_NODES)
+        # Scope the traversal to a subtree instead of the whole file by starting from a
+        # non-root handle -- e.g. the node currently selected in the tree UI.
+        root_handle = params.get("root", 0)
+        if root_handle not in self.registry.objects:
+            raise ValueError(f"unknown handle {root_handle}")
 
         hits = []
         state = {"visited": 0, "truncated": False}
 
-        def walk(handle, path):
+        def walk(handle, path, ancestors):
             if len(hits) >= limit or state["truncated"]:
                 return
             obj = self.registry.objects[handle]
@@ -211,19 +232,23 @@ class Sidecar:
                         "handle": value_handle,
                         "path": child_path,
                         "preview": preview_for(value, value_children),
+                        # Handles of every node strictly between the search root and this
+                        # hit's parent, in top-down order. The client walks this list,
+                        # lazily paginating each node's children as needed, to expand the
+                        # tree down to the hit before selecting it.
+                        "ancestors": list(ancestors),
                     })
                     if len(hits) >= limit:
                         return
 
                 if cycle_handle is None and value_children:
-                    walk(value_handle, child_path)
+                    walk(value_handle, child_path, ancestors + [value_handle])
                     if len(hits) >= limit or state["truncated"]:
                         return
 
-        if 0 in self.registry.objects:
-            walk(0, "$")
+        walk(root_handle, "$", [])
 
-        return {"hits": hits, "truncated": state["truncated"]}
+        return {"hits": hits, "truncated": state["truncated"], "visited": state["visited"]}
 
 
 def main():

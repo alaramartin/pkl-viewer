@@ -208,6 +208,30 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 							});
 						}
 						break;
+					case "treeSearch":
+						try {
+							if (!sidecar) {
+								throw new Error("sidecar is not available");
+							}
+							// Bounded traversal (src/py/sidecar.py DEFAULT_SEARCH_MAX_NODES) runs
+							// entirely in the sidecar -- the object graph never crosses into the
+							// webview to be searched there.
+							const result = await sidecar.search(message.query, message.matchScope, message.limit, message.root);
+							webviewPanel.webview.postMessage({
+								command: "treeSearchResult",
+								requestId: message.requestId,
+								hits: result.hits,
+								truncated: result.truncated,
+								visited: result.visited,
+							});
+						} catch (err: any) {
+							webviewPanel.webview.postMessage({
+								command: "treeSearchError",
+								requestId: message.requestId,
+								message: err.message ?? String(err),
+							});
+						}
+						break;
 					case "copyToClipboard":
 						if (typeof message.text === "string") {
 							await vscode.env.clipboard.writeText(message.text);
@@ -363,6 +387,17 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 			<h3>Pickled Data</h3>
 			<button id="toggle-view" class="fixed-top-right">Show raw disassembly</button>
 			<div id="tree-view">
+				<div id="tree-search-bar" class="tree-search-bar">
+					<input id="tree-search-input" type="text" placeholder="Search keys/values…" />
+					<select id="tree-search-scope">
+						<option value="keys+values">Keys + values</option>
+						<option value="keys">Keys only</option>
+						<option value="values">Values only</option>
+					</select>
+					<label><input type="checkbox" id="tree-search-subtree" /> Selected subtree only</label>
+					<span id="tree-search-status" class="tree-search-status"></span>
+				</div>
+				<div id="tree-search-results" class="tree-search-results" style="display:none;"></div>
 				<div id="breadcrumb" class="breadcrumb"></div>
 				<div id="tree-container" class="tree-container"></div>
 			</div>

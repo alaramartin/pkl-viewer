@@ -49,8 +49,24 @@ interface TreeNode {
 /** A row actually rendered: either a real node, or a synthetic "load more" affordance. */
 type Row = { kind: 'node'; node: TreeNode } | { kind: 'loadMore'; node: TreeNode };
 
+export type SearchMatchScope = 'keys' | 'values' | 'keys+values';
+
+export interface SearchHit {
+	handle: number;
+	path: string;
+	preview: string;
+	/** Handles to expand, top-down, between the search root and this hit's parent. */
+	ancestors: number[];
+}
+
 export interface TreeHost {
 	requestExpand(handle: number, offset: number, limit: number): Promise<{ total: number; nodes: RemoteNode[] }>;
+	requestSearch(
+		query: string,
+		matchScope: SearchMatchScope,
+		root: number,
+		limit: number
+	): Promise<{ hits: SearchHit[]; truncated: boolean; visited: number }>;
 	copyToClipboard(text: string): void;
 }
 
@@ -168,6 +184,66 @@ export class Tree {
 			});
 		}
 		node.loadedCount += nodes.length;
+	}
+
+	/** Handle to scope a search to: the selected node's subtree, or the whole tree. */
+	currentSearchRoot(subtreeOnly: boolean): number {
+		const node = (subtreeOnly && this.selected) || this.root;
+		return node ? node.handle : 0;
+	}
+
+	async runSearch(
+		query: string,
+		matchScope: SearchMatchScope,
+		subtreeOnly: boolean
+	): Promise<{ hits: SearchHit[]; truncated: boolean; visited: number; rootHandle: number }> {
+		const rootHandle = this.currentSearchRoot(subtreeOnly);
+		const { hits, truncated, visited } = await this.host.requestSearch(query, matchScope, rootHandle, 100);
+		return { hits, truncated, visited, rootHandle };
+	}
+
+	/** Expands the tree down to a search hit (paginating each ancestor as needed) and selects it. */
+	async revealHit(rootHandle: number, hit: SearchHit): Promise<void> {
+		let node = this.nodeByHandle(rootHandle);
+		if (!node) {
+			return;
+		}
+		for (const handle of [...hit.ancestors, hit.handle]) {
+			const child = await this.ensureChildLoaded(node, handle);
+			if (!child) {
+				return;
+			}
+			node = child;
+		}
+		this.select(node);
+		const rowIndex = this.rows.findIndex((r) => r.kind === 'node' && r.node === node);
+		if (rowIndex >= 0) {
+			this.viewport.scrollTop = rowIndex * ROW_HEIGHT;
+		}
+	}
+
+	/** Ensures `handle` is loaded among `parent`'s children, paginating until found or exhausted. */
+	private async ensureChildLoaded(parent: TreeNode, handle: number): Promise<TreeNode | null> {
+		parent.expanded = true;
+		try {
+			if (parent.loadState === 'unloaded') {
+				parent.loadState = 'loading';
+				await this.loadMore(parent);
+				parent.loadState = 'loaded';
+			}
+			let found = parent.children.find((c) => c.handle === handle);
+			while (!found && parent.loadedCount < parent.totalCount) {
+				await this.loadMore(parent);
+				found = parent.children.find((c) => c.handle === handle);
+			}
+			this.rebuildRows();
+			return found ?? null;
+		} catch (err) {
+			parent.loadState = 'error';
+			parent.errorMessage = err instanceof Error ? err.message : String(err);
+			this.rebuildRows();
+			return null;
+		}
 	}
 
 	/** Recomputes the flat row list from tree state (expanded/collapsed, paging) and re-renders. */
