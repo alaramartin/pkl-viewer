@@ -14,35 +14,29 @@ button {
     right: 50px;
     z-index: 1001;
 }
-.fixed-top-right {
-    position: fixed;
-    top: 10px;
-    right: 20px;
-    z-index: 1001;
-}
 .tooltip:not(.fixed-bottom-right) {
     position: relative;
     display: inline-block;
 }
-.tooltip .tooltiptext {
-    visibility: hidden;
-    width: 200px;
-    background-color: var(--vscode-editor-background);
-    color: var(--vscode-editor-foreground);
-    text-align: center;
-    border-radius: 6px;
-    padding: 5px;
-    position: absolute;
-    z-index: 1000;
-    bottom: 125%;
+.tooltip .tooltiptext {  
+    visibility: hidden;  
+    width: 200px;  
+    background-color: var(--vscode-editor-background);  
+    color: var(--vscode-editor-foreground);  
+    text-align: center;  
+    border-radius: 6px;  
+    padding: 5px;  
+    position: absolute;  
+    z-index: 1000;  
+    bottom: 125%;  
     left: 50%;
     transform: translateX(-50%);
     margin-left: 0;
     font-size: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-}
-.tooltip:hover .tooltiptext {
-    visibility: visible;
+}  
+.tooltip:hover .tooltiptext {  
+    visibility: visible;  
 }
 .tooltip .tooltiptext::after {
     content: "";
@@ -82,171 +76,4 @@ button {
 @keyframes spin {
   0% { transform: translate(-50%, -50%) rotate(0deg); }
   100% { transform: translate(-50%, -50%) rotate(360deg); }
-}
-
-/* Tree explorer (PLAN.md 1.1) */
-
-#tree-view {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-}
-
-.tree-search-bar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 10px;
-    flex: 0 0 auto;
-}
-.tree-search-bar input[type="text"] {
-    flex: 1 1 auto;
-    background: var(--vscode-input-background);
-    color: var(--vscode-input-foreground);
-    border: 1px solid var(--vscode-input-border, transparent);
-    padding: 4px 6px;
-    border-radius: 3px;
-}
-.tree-search-bar select {
-    background: var(--vscode-dropdown-background);
-    color: var(--vscode-dropdown-foreground);
-    border: 1px solid var(--vscode-dropdown-border, transparent);
-    padding: 3px;
-    border-radius: 3px;
-}
-.tree-search-status {
-    font-size: 12px;
-    color: var(--vscode-descriptionForeground);
-    white-space: nowrap;
-}
-
-.tree-search-results {
-    flex: 0 0 auto;
-    max-height: 40vh;
-    overflow-y: auto;
-    border-bottom: 1px solid var(--vscode-panel-border, transparent);
-}
-.tree-search-hit {
-    padding: 4px 10px;
-    cursor: pointer;
-    font-size: 12px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.tree-search-hit:hover {
-    background: var(--vscode-list-hoverBackground);
-}
-.tree-search-hit .hit-path {
-    color: var(--vscode-symbolIcon-fieldForeground, var(--vscode-editor-foreground));
-    font-weight: 600;
-    margin-right: 8px;
-}
-.tree-search-hit .hit-preview {
-    color: var(--vscode-descriptionForeground);
-}
-
-.breadcrumb {
-    flex: 0 0 auto;
-    padding: 6px 10px;
-    font-size: 12px;
-    color: var(--vscode-descriptionForeground);
-    border-bottom: 1px solid var(--vscode-panel-border, transparent);
-    white-space: nowrap;
-    overflow-x: auto;
-}
-.breadcrumb-segment {
-    cursor: pointer;
-}
-.breadcrumb-segment:hover {
-    color: var(--vscode-textLink-foreground);
-    text-decoration: underline;
-}
-.breadcrumb-sep {
-    opacity: 0.6;
-}
-
-.tree-container {
-    position: relative;
-    overflow-y: auto;
-    overflow-x: hidden;
-    flex: 1 1 auto;
-    min-height: 0;
-    font-family: var(--vscode-editor-font-family, monospace);
-    font-size: var(--vscode-editor-font-size, 13px);
-}
-.tree-spacer {
-    position: relative;
-    width: 100%;
-}
-.tree-rows {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-}
-.tree-row {
-    display: flex;
-    align-items: center;
-    height: 22px;
-    line-height: 22px;
-    white-space: nowrap;
-    cursor: pointer;
-    gap: 6px;
-}
-.tree-row:hover {
-    background: var(--vscode-list-hoverBackground);
-}
-.tree-row.selected {
-    background: var(--vscode-list-activeSelectionBackground);
-    color: var(--vscode-list-activeSelectionForeground);
-}
-.tree-load-more {
-    color: var(--vscode-textLink-foreground);
-    font-style: italic;
-}
-.tree-caret {
-    display: inline-block;
-    width: 12px;
-    text-align: center;
-    color: var(--vscode-descriptionForeground);
-}
-.tree-key {
-    color: var(--vscode-symbolIcon-fieldForeground, var(--vscode-editor-foreground));
-    font-weight: 600;
-}
-.tree-type {
-    color: var(--vscode-descriptionForeground);
-    font-size: 0.9em;
-}
-.tree-size {
-    color: var(--vscode-descriptionForeground);
-    font-size: 0.85em;
-}
-.tree-preview {
-    color: var(--vscode-editor-foreground);
-    opacity: 0.85;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.tree-context-menu {
-    position: fixed;
-    z-index: 3000;
-    background: var(--vscode-menu-background, var(--vscode-editor-background));
-    color: var(--vscode-menu-foreground, var(--vscode-editor-foreground));
-    border: 1px solid var(--vscode-menu-border, var(--vscode-panel-border));
-    border-radius: 4px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    padding: 4px 0;
-    min-width: 140px;
-}
-.tree-context-menu-item {
-    padding: 5px 12px;
-    cursor: pointer;
-    font-size: 12px;
-}
-.tree-context-menu-item:hover {
-    background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
-    color: var(--vscode-menu-selectionForeground, var(--vscode-list-hoverForeground));
 }

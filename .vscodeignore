@@ -1,9 +1,6 @@
 .vscode/**
 .vscode-test/**
 src/**
-out/test/**
-out/core/**
-esbuild.js
 .gitignore
 .yarnrc
 vsc-extension-quickstart.md
@@ -14,4 +11,4 @@ PLAN.md
 **/*.ts
 **/.vscode-test.*
 !src/panelWebview.css
-!src/py/sidecar.py
+!src/webview.js

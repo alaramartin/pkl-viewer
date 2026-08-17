@@ -1,8 +1,6 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
 import { detectFileKind } from './core/sniff';
 import { escapeHtml } from './core/escape';
-import { PickleSidecar } from './core/sidecar';
 
 // get either python or python3 or whatever the user uses to increase compatibility
 async function getPythonPath(): Promise<string> {
@@ -62,10 +60,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 
 		webviewPanel.webview.options = {
 			enableScripts: true,
-			localResourceRoots: [
-				vscode.Uri.joinPath(this.context.extensionUri, 'src'),
-				vscode.Uri.joinPath(this.context.extensionUri, 'out')
-			]
+			localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, 'src')]
 		};
 
 		const kind = await detectFileKind(document.uri);
@@ -80,7 +75,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 							webviewPanel.dispose();
 							break;
 						case "viewAsPickleAnyway":
-							await this.renderPickleView(document, webviewPanel, token);
+							await this.renderPickleView(document, webviewPanel);
 							break;
 						case "dontAskAgain":
 							await this.context.workspaceState.update(SUPPRESS_APPLE_PKL_NOTICE_KEY, true);
@@ -98,7 +93,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 			webviewPanel.webview.onDidReceiveMessage(
 				async message => {
 					if (message.command === "viewAsPickleAnyway") {
-						await this.renderPickleView(document, webviewPanel, token);
+						await this.renderPickleView(document, webviewPanel);
 					}
 				},
 				undefined,
@@ -107,41 +102,16 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 			return;
 		}
 
-		await this.renderPickleView(document, webviewPanel, token);
+		await this.renderPickleView(document, webviewPanel);
 	}
 
 	// runs the actual pickletools/pickle disassembly flow and wires up its message handlers
-	async renderPickleView(document: vscode.CustomDocument, webviewPanel: vscode.WebviewPanel, token: vscode.CancellationToken): Promise<void> {
+	async renderPickleView(document: vscode.CustomDocument, webviewPanel: vscode.WebviewPanel): Promise<void> {
 		const filepath = document.uri.fsPath;
 		// save the full pickle content if it gets loaded once
 		let fullPickleContent = "";
 		let fullPickleToolsContent = "";
 		const pythonPath = await getPythonPath();
-
-		// Tree explorer (PLAN.md #1.1): one long-lived sidecar process per open editor,
-		// keeping the unpickled object resident so expanding a subtree is a lookup rather
-		// than a full re-parse. The webview drives it lazily via "treeExpand" messages once
-		// it signals "treeReady"; the raw pickletools/pickle view below stays reachable via
-		// a toggle regardless of whether the sidecar is available.
-		let sidecar: PickleSidecar | undefined;
-		let sidecarRoot: Awaited<ReturnType<PickleSidecar['open']>> | undefined;
-		const disposeSidecar = () => {
-			sidecar?.dispose();
-			sidecar = undefined;
-		};
-		if (!token.isCancellationRequested) {
-			try {
-				const scriptPath = path.join(this.context.extensionUri.fsPath, 'src', 'py', 'sidecar.py');
-				sidecar = new PickleSidecar(pythonPath, scriptPath);
-				sidecarRoot = await sidecar.open(filepath);
-			} catch {
-				// A failure to spawn the sidecar (e.g. an unusual Python setup) must not
-				// break the existing raw view; the webview just hides the tree toggle.
-				disposeSidecar();
-			}
-		}
-		webviewPanel.onDidDispose(disposeSidecar, undefined, this.context.subscriptions);
-		token.onCancellationRequested(disposeSidecar, undefined, this.context.subscriptions);
 
 		// helper to promisify spawn for large output
 		function spawnAsync(cmd: string, args: string[]): Promise<string> {
@@ -181,62 +151,6 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 		webviewPanel.webview.onDidReceiveMessage(
 			async message => {
 				switch (message.command) {
-					case "treeReady":
-						if (sidecar && sidecarRoot) {
-							webviewPanel.webview.postMessage({ command: "treeInit", root: sidecarRoot });
-						} else {
-							webviewPanel.webview.postMessage({ command: "treeUnavailable" });
-						}
-						break;
-					case "treeExpand":
-						try {
-							if (!sidecar) {
-								throw new Error("sidecar is not available");
-							}
-							const result = await sidecar.expand(message.handle, message.offset, message.limit);
-							webviewPanel.webview.postMessage({
-								command: "treeExpandResult",
-								requestId: message.requestId,
-								total: result.total,
-								nodes: result.nodes,
-							});
-						} catch (err: any) {
-							webviewPanel.webview.postMessage({
-								command: "treeExpandError",
-								requestId: message.requestId,
-								message: err.message ?? String(err),
-							});
-						}
-						break;
-					case "treeSearch":
-						try {
-							if (!sidecar) {
-								throw new Error("sidecar is not available");
-							}
-							// Bounded traversal (src/py/sidecar.py DEFAULT_SEARCH_MAX_NODES) runs
-							// entirely in the sidecar -- the object graph never crosses into the
-							// webview to be searched there.
-							const result = await sidecar.search(message.query, message.matchScope, message.limit, message.root);
-							webviewPanel.webview.postMessage({
-								command: "treeSearchResult",
-								requestId: message.requestId,
-								hits: result.hits,
-								truncated: result.truncated,
-								visited: result.visited,
-							});
-						} catch (err: any) {
-							webviewPanel.webview.postMessage({
-								command: "treeSearchError",
-								requestId: message.requestId,
-								message: err.message ?? String(err),
-							});
-						}
-						break;
-					case "copyToClipboard":
-						if (typeof message.text === "string") {
-							await vscode.env.clipboard.writeText(message.text);
-						}
-						break;
 					case "load more":
 						// use -mpickle and update the html
 						try {
@@ -370,7 +284,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 			vscode.Uri.joinPath(this.context.extensionUri, 'src', 'panelWebview.css')
 		);
 		const scriptUri = webview.asWebviewUri(
-			vscode.Uri.joinPath(this.context.extensionUri, 'out', 'webview.js')
+			vscode.Uri.joinPath(this.context.extensionUri, 'src', 'webview.js')
 		);
 		const nonce = getNonce();
 
@@ -385,25 +299,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 		</head>
 		<body>
 			<h3>Pickled Data</h3>
-			<button id="toggle-view" class="fixed-top-right">Show raw disassembly</button>
-			<div id="tree-view">
-				<div id="tree-search-bar" class="tree-search-bar">
-					<input id="tree-search-input" type="text" placeholder="Search keys/values…" />
-					<select id="tree-search-scope">
-						<option value="keys+values">Keys + values</option>
-						<option value="keys">Keys only</option>
-						<option value="values">Values only</option>
-					</select>
-					<label><input type="checkbox" id="tree-search-subtree" /> Selected subtree only</label>
-					<span id="tree-search-status" class="tree-search-status"></span>
-				</div>
-				<div id="tree-search-results" class="tree-search-results" style="display:none;"></div>
-				<div id="breadcrumb" class="breadcrumb"></div>
-				<div id="tree-container" class="tree-container"></div>
-			</div>
-			<div id="raw-view" style="display:none;">
-				<pre>${content}</pre>
-			</div>
+			<pre>${content}</pre>
 			<div class="loader"></div>
 			<div class="tooltip fixed-bottom-right">
 				<button class="load-more default-visible">Load Full Readable Pickle</button>
