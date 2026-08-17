@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { detectFileKind } from './core/sniff';
 import { escapeHtml } from './core/escape';
+import { PickleSidecar } from './core/sidecar';
 
 // get either python or python3 or whatever the user uses to increase compatibility
 async function getPythonPath(): Promise<string> {
@@ -60,7 +62,10 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 
 		webviewPanel.webview.options = {
 			enableScripts: true,
-			localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, 'src')]
+			localResourceRoots: [
+				vscode.Uri.joinPath(this.context.extensionUri, 'src'),
+				vscode.Uri.joinPath(this.context.extensionUri, 'out')
+			]
 		};
 
 		const kind = await detectFileKind(document.uri);
@@ -75,7 +80,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 							webviewPanel.dispose();
 							break;
 						case "viewAsPickleAnyway":
-							await this.renderPickleView(document, webviewPanel);
+							await this.renderPickleView(document, webviewPanel, token);
 							break;
 						case "dontAskAgain":
 							await this.context.workspaceState.update(SUPPRESS_APPLE_PKL_NOTICE_KEY, true);
@@ -93,7 +98,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 			webviewPanel.webview.onDidReceiveMessage(
 				async message => {
 					if (message.command === "viewAsPickleAnyway") {
-						await this.renderPickleView(document, webviewPanel);
+						await this.renderPickleView(document, webviewPanel, token);
 					}
 				},
 				undefined,
@@ -102,16 +107,40 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 			return;
 		}
 
-		await this.renderPickleView(document, webviewPanel);
+		await this.renderPickleView(document, webviewPanel, token);
 	}
 
 	// runs the actual pickletools/pickle disassembly flow and wires up its message handlers
-	async renderPickleView(document: vscode.CustomDocument, webviewPanel: vscode.WebviewPanel): Promise<void> {
+	async renderPickleView(document: vscode.CustomDocument, webviewPanel: vscode.WebviewPanel, token: vscode.CancellationToken): Promise<void> {
 		const filepath = document.uri.fsPath;
 		// save the full pickle content if it gets loaded once
 		let fullPickleContent = "";
 		let fullPickleToolsContent = "";
 		const pythonPath = await getPythonPath();
+
+		// Foundation for the upcoming tree explorer (PLAN.md #1): one long-lived
+		// sidecar process per open editor, keeping the unpickled object resident so
+		// expansion doesn't re-parse the file. Not wired into rendering yet — that
+		// lands with the tree view itself — but its lifecycle (spawn/open, kill on
+		// dispose or cancellation) is real and testable now.
+		let sidecar: PickleSidecar | undefined;
+		const disposeSidecar = () => {
+			sidecar?.dispose();
+			sidecar = undefined;
+		};
+		if (!token.isCancellationRequested) {
+			try {
+				const scriptPath = path.join(this.context.extensionUri.fsPath, 'src', 'py', 'sidecar.py');
+				sidecar = new PickleSidecar(pythonPath, scriptPath);
+				await sidecar.open(filepath);
+			} catch {
+				// Sidecar is inert infrastructure right now; a failure to spawn it
+				// (e.g. an unusual Python setup) must not break the existing view.
+				disposeSidecar();
+			}
+		}
+		webviewPanel.onDidDispose(disposeSidecar, undefined, this.context.subscriptions);
+		token.onCancellationRequested(disposeSidecar, undefined, this.context.subscriptions);
 
 		// helper to promisify spawn for large output
 		function spawnAsync(cmd: string, args: string[]): Promise<string> {
@@ -284,7 +313,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 			vscode.Uri.joinPath(this.context.extensionUri, 'src', 'panelWebview.css')
 		);
 		const scriptUri = webview.asWebviewUri(
-			vscode.Uri.joinPath(this.context.extensionUri, 'src', 'webview.js')
+			vscode.Uri.joinPath(this.context.extensionUri, 'out', 'webview.js')
 		);
 		const nonce = getNonce();
 

@@ -6,6 +6,10 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+- Internal: build now goes through esbuild instead of bare `tsc`, and a long-lived Python
+  sidecar process (`src/py/sidecar.py`) is spun up per open editor as foundation for the
+  upcoming tree explorer. No user-visible change yet.
+
 ## [0.2.1] - 2026-08-16
 
 - Fixed: `.pkl` files belonging to Apple's Pkl configuration language no longer open as a binary
