@@ -6,6 +6,15 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-18
+
+- Added: **PKL Viewer: Export...** — export a pickle to JSON, CSV, or Parquet. Available from the
+  command palette, an editor/title button, the Explorer right-click menu, and an **Export as...**
+  button in the viewer itself. JSON works for any pickle (custom encoder for arrays, DataFrames,
+  datetimes, bytes, sets, Decimals). CSV and Parquet are offered only for tabular data (DataFrame,
+  Series, 2D array, or list of dicts); Parquet needs `pyarrow` or `fastparquet` and says so plainly
+  if neither is installed. Export runs as a cancellable, progress-tracked background task.
+
 ## [0.2.1] - 2026-08-16
 
 - Fixed: `.pkl` files belonging to Apple's Pkl configuration language no longer open as a binary
