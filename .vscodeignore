@@ -12,3 +12,4 @@ PLAN.md
 **/.vscode-test.*
 !src/panelWebview.css
 !src/webview.js
+!src/py/**

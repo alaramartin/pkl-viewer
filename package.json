@@ -53,7 +53,35 @@
         ],
         "priority": "default"
       }
-    ]
+    ],
+    "commands": [
+      {
+        "command": "pkl-viewer.exportFile",
+        "title": "PKL Viewer: Export...",
+        "icon": "$(export)"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "pkl-viewer.exportFile"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "pkl-viewer.exportFile",
+          "when": "activeCustomEditorId == pklViewer.pkl",
+          "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "pkl-viewer.exportFile",
+          "when": "resourceFilename =~ /\\.(pkl|pickle)(\\.(gz|bz2|xz))?$/",
+          "group": "6_export"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

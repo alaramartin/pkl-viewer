@@ -16,6 +16,10 @@ document.addEventListener("DOMContentLoaded", function() {
             vscode.postMessage({
                 command: "revert"
             });
+        } else if (e.target.classList.contains("export-to")) {
+            vscode.postMessage({
+                command: "exportTo"
+            });
         }
     });
 

@@ -58,6 +58,15 @@ button {
     display: inline-block;
 }
 
+.export-to {
+    position: fixed;
+    right: 50px;
+    bottom: 15px;
+    z-index: 1001;
+    padding: 4px 10px;
+    font-size: 0.85em;
+}
+
 .loader {
   visibility: hidden;
   border: 16px solid var(--vscode-editor-foreground);

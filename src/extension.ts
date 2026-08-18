@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import { detectFileKind } from './core/sniff';
 import { escapeHtml } from './core/escape';
+import { spawnAsync } from './core/proc';
+import { registerExportCommand } from './core/export';
 
 // get either python or python3 or whatever the user uses to increase compatibility
 async function getPythonPath(): Promise<string> {
@@ -113,31 +115,6 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 		let fullPickleToolsContent = "";
 		const pythonPath = await getPythonPath();
 
-		// helper to promisify spawn for large output
-		function spawnAsync(cmd: string, args: string[]): Promise<string> {
-			const { spawn } = require('child_process');
-			return new Promise((resolve, reject) => {
-				const child = spawn(cmd, args);
-				let stdout = '';
-				let stderr = '';
-				child.stdout.on('data', (data: Buffer) => {
-					stdout += data.toString();
-				});
-				child.stderr.on('data', (data: Buffer) => {
-					stderr += data.toString();
-				});
-				child.on('close', (code: number) => {
-					if (code !== 0) {
-						reject(new Error(stderr || `Process exited with code ${code}`));
-					} else {
-						resolve(stdout);
-					}
-				});
-				child.on('error', (err: Error) => {
-					reject(err);
-				});
-			});
-		}
 		try {
 			// get safe and quick output
 			fullPickleToolsContent = await spawnAsync(pythonPath, ['-m', 'pickletools', filepath]);
@@ -190,6 +167,11 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 							// tell user there is an error, then stay with original pickletools
 							vscode.window.showInformationMessage("There was an error loading the full Pickle file.");
 						}
+						break;
+					case "exportTo":
+						// same command the palette/editor-title/explorer-context entries use,
+						// just invoked with the file already known
+						await vscode.commands.executeCommand('pkl-viewer.exportFile', document.uri);
 						break;
 				}
 			},
@@ -307,6 +289,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 			</div>
 			<button class="revert fixed-bottom-right">Revert to basic view</button>
 			<button class="re-revert fixed-bottom-right">Go back to full view</button>
+			<button class="export-to">Export as...</button>
 			<script nonce="${nonce}" src="${scriptUri}"></script>
 		</body>
 		</html>`;
@@ -326,6 +309,8 @@ function getNonce(): string {
 export function activate(context: vscode.ExtensionContext) {
 	// register the custom editor
 	context.subscriptions.push(PKLEditorProvider.register(context));
+	// register the whole-file export command (PKL Viewer: Export...)
+	context.subscriptions.push(registerExportCommand(context, getPythonPath));
 }
 
 // called when extension is deactivated
