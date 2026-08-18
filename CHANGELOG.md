@@ -6,6 +6,8 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-18
+
 - Added: **PKL Viewer: Send Feedback** — opens a prefilled GitHub issue (extension version, VS
   Code version, OS, and Python version) in the browser for review before submitting; nothing is
   sent automatically. Available from the command palette and a **Send feedback** link in the
