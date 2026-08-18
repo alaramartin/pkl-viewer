@@ -61,10 +61,23 @@ button {
 .export-to {
     position: fixed;
     right: 50px;
+    top: 15px;
+    z-index: 1001;
+    padding: 4px 10px;
+    font-size: 0.85em;
+}
+
+.send-feedback {
+    position: fixed;
+    right: 50px;
     bottom: 15px;
     z-index: 1001;
     padding: 4px 10px;
     font-size: 0.85em;
+    color: var(--vscode-textLink-foreground);
+}
+.send-feedback:hover {
+    color: var(--vscode-textLink-activeForeground);
 }
 
 .loader {

@@ -20,6 +20,11 @@ document.addEventListener("DOMContentLoaded", function() {
             vscode.postMessage({
                 command: "exportTo"
             });
+        } else if (e.target.classList.contains("send-feedback")) {
+            e.preventDefault();
+            vscode.postMessage({
+                command: "sendFeedback"
+            });
         }
     });
 

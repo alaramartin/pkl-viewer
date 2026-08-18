@@ -59,12 +59,20 @@
         "command": "pkl-viewer.exportFile",
         "title": "PKL Viewer: Export...",
         "icon": "$(export)"
+      },
+      {
+        "command": "pkl-viewer.sendFeedback",
+        "title": "PKL Viewer: Send Feedback",
+        "icon": "$(feedback)"
       }
     ],
     "menus": {
       "commandPalette": [
         {
           "command": "pkl-viewer.exportFile"
+        },
+        {
+          "command": "pkl-viewer.sendFeedback"
         }
       ],
       "editor/title": [

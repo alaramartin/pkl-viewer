@@ -3,6 +3,7 @@ import { detectFileKind } from './core/sniff';
 import { escapeHtml } from './core/escape';
 import { spawnAsync } from './core/proc';
 import { registerExportCommand } from './core/export';
+import { registerSendFeedbackCommand } from './core/feedback';
 
 // get either python or python3 or whatever the user uses to increase compatibility
 async function getPythonPath(): Promise<string> {
@@ -173,6 +174,9 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 						// just invoked with the file already known
 						await vscode.commands.executeCommand('pkl-viewer.exportFile', document.uri);
 						break;
+					case "sendFeedback":
+						await vscode.commands.executeCommand('pkl-viewer.sendFeedback');
+						break;
 				}
 			},
 			undefined,
@@ -290,6 +294,7 @@ class PKLEditorProvider implements vscode.CustomReadonlyEditorProvider<vscode.Cu
 			<button class="revert fixed-bottom-right">Revert to basic view</button>
 			<button class="re-revert fixed-bottom-right">Go back to full view</button>
 			<button class="export-to">Export as...</button>
+			<a href="#" class="send-feedback">Send feedback</a>
 			<script nonce="${nonce}" src="${scriptUri}"></script>
 		</body>
 		</html>`;
@@ -311,6 +316,8 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(PKLEditorProvider.register(context));
 	// register the whole-file export command (PKL Viewer: Export...)
 	context.subscriptions.push(registerExportCommand(context, getPythonPath));
+	// register the feedback command (PKL Viewer: Send Feedback)
+	context.subscriptions.push(registerSendFeedbackCommand(context, getPythonPath));
 }
 
 // called when extension is deactivated

@@ -6,6 +6,11 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+- Added: **PKL Viewer: Send Feedback** — opens a prefilled GitHub issue (extension version, VS
+  Code version, OS, and Python version) in the browser for review before submitting; nothing is
+  sent automatically. Available from the command palette and a **Send feedback** link in the
+  viewer, bottom-right; the **Export as...** button moved to top-right to make room for it.
+
 ## [0.3.0] - 2026-08-18
 
 - Added: **PKL Viewer: Export...** — export a pickle to JSON, CSV, or Parquet. Available from the
